@@ -1,59 +1,94 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Player 1</title>
-<style>
-body { font-family: Arial; text-align: center; padding: 50px; background: #e0f7fa; }
-button { padding: 20px 50px; font-size: 22px; margin: 10px; border: none; border-radius: 12px; cursor: pointer;
-        background: linear-gradient(to right, #2196f3, #64b5f6); color: white; transition: transform 0.1s; }
-button:active { transform: scale(0.95); }
-#status { font-size: 24px; margin-bottom: 20px; }
-</style>
-</head>
-<body>
-<h1>Player 1</h1>
-<p id="status">connecting...</p>
-<button id="buzzBtn">BUZZ</button>
+from fastapi import FastAPI, WebSocket
+from fastapi.staticfiles import StaticFiles
+import asyncio
+from time import time
 
-<script>
-// Player rolu
-const role = "player1"; // player2.html-də "player2" et
+app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-// WebSocket
-const ws = new WebSocket("wss://br-buzz-bahruz.up.railway.app/ws");
+players = {}
+countdown_task = None
+COUNTDOWN_TIME = 20  # saniyə
+game_active = False
+start_time = None
 
-// Dərhal səslər üçün preload
-const buzzSound = new Audio("/static/buzz.mp3");
-buzzSound.preload = "auto";
-const startSound = new Audio("/static/start.mp3");
-startSound.preload = "auto";
-const warningSound = new Audio("/static/warning.mp3");
-warningSound.preload = "auto";
+async def countdown():
+    global countdown_task, game_active, start_time
+    game_active = True
+    start_time = time()
+    time_left = COUNTDOWN_TIME
+    try:
+        while time_left > 0:
+            await asyncio.sleep(0.1)
+            time_left = COUNTDOWN_TIME - int(time() - start_time)
+            if time_left <= 3:
+                for ws in players.values():
+                    await ws.send_text("warning")
+            for ws in players.values():
+                await ws.send_text(f"countdown:{time_left}")
+        for ws in players.values():
+            await ws.send_text("time_up")
+    finally:
+        countdown_task = None
+        game_active = False
 
-// WS açıldı
-ws.onopen = () => {
-  document.getElementById("status").innerText = "connected ✅";
-  ws.send(role);
-};
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    global countdown_task, game_active, start_time
+    try:
+        role = await websocket.receive_text()
+        players[role] = websocket
+        await websocket.send_text("connected")
 
-// WS mesajları
-ws.onmessage = (event) => {
-    const data = event.data;
-    if(data === "won") alert("YOU WON!");
-    else if(data === "lost") alert("YOU LOST!");
-    else if(data === "warning") warningSound.play();
-    else if(data === "start_sound") startSound.play();
-    else if(data === "reset") alert("Game Reset!");
-    else if(data === "faul") alert("FAUL! Tez basıldı!");
-};
+        while True:
+            msg = await websocket.receive_text()
+            
+            if msg == "start" and role == "admin":
+                if countdown_task is None:
+                    countdown_task = asyncio.create_task(countdown())
+                    for ws in players.values():
+                        await ws.send_text("start_sound")
 
-// BUZZ düyməsi
-document.getElementById("buzzBtn").onclick = () => {
-    buzzSound.currentTime = 0; // hər dəfə sıfırdan çal
-    buzzSound.play();           // dərhal səslə
-    ws.send("buzz:" + role);    // sonra serverə mesaj
-};
-</script>
-</body>
-</html>
+            elif msg.startswith("buzz:"):
+                player_name = msg.split(":")[1]
+                if not game_active:
+                    await websocket.send_text("faul")
+                else:
+                    ms_time = int((time() - start_time) * 1000)
+                    for r, ws in players.items():
+                        if r == player_name:
+                            await ws.send_text("won")
+                        elif r != "admin":
+                            await ws.send_text("lost")
+                        # show buzz time for admin
+                        if r == "admin":
+                            await ws.send_text(f"buzz_time:{player_name}:{ms_time}")
+                    # stop countdown
+                    if countdown_task:
+                        countdown_task.cancel()
+                        countdown_task = None
+                        game_active = False
+
+            elif msg == "reset" and role == "admin":
+                if countdown_task:
+                    countdown_task.cancel()
+                    countdown_task = None
+                game_active = False
+                start_time = None
+                for ws in players.values():
+                    await ws.send_text("reset")
+
+    except:
+        pass
+    finally:
+        # disconnect zamanı sil
+        for k, v in list(players.items()):
+            if v == websocket:
+                del players[k]
+
+
+if __name__ == "__main__":
+    import os, uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("server:app", host="0.0.0.0", port=port)
