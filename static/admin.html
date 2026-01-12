@@ -2,74 +2,36 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Admin Panel</title>
-<style>
-body {
-  font-family: system-ui;
-  background: #0f172a;
-  color: white;
-  text-align: center;
-}
-button {
-  font-size: 22px;
-  padding: 14px 28px;
-  margin: 10px;
-  border-radius: 12px;
-  border: none;
-  cursor: pointer;
-}
-#start { background: #22c55e; }
-#reset { background: #ef4444; }
-#log { margin-top: 20px; font-size: 20px; }
-</style>
+<title>Admin</title>
 </head>
 <body>
-
-<h1>ADMIN</h1>
-
-<button id="start">START</button>
-<button id="reset">RESET</button>
-
-<div id="log">Disconnected</div>
+<h2>Admin Panel</h2>
+<p id="status">connecting...</p>
+<button id="startBtn">START</button>
+<button id="resetBtn">RESET</button>
 
 <script>
-const ws = new WebSocket("wss://br-buzz-bahruz.up.railway.app/ws");
-
-const log = document.getElementById("log");
+const ws = new WebSocket("wss://YOUR_DOMAIN_HERE/ws");
 
 ws.onopen = () => {
-  ws.send(JSON.stringify({ role: "admin" }));
-  log.innerText = "Connected";
+  document.getElementById("status").innerText = "connected ✅";
+  ws.send("admin");
 };
 
-ws.onmessage = (e) => {
-  const data = JSON.parse(e.data);
-
-  if (data.type === "countdown") {
-    log.innerText = "Time: " + data.value;
-  }
-
-  if (data.type === "won") {
-    log.innerText = `${data.player} WON (${data.reaction} ms)`;
-  }
-
-  if (data.type === "time_up") {
-    log.innerText = "TIME UP";
-  }
-
-  if (data.type === "reset") {
-    log.innerText = "RESET";
+ws.onmessage = (event) => {
+  if(event.data === "start_sound") {
+    new Audio("/static/start.mp3").play();
+  } else if(event.data === "warning") {
+    new Audio("/static/warning.mp3").play();
+  } else if(event.data === "time_up") {
+    alert("TIME UP!");
+  } else if(event.data === "reset") {
+    alert("Game Reset!");
   }
 };
 
-document.getElementById("start").onclick = () => {
-  ws.send(JSON.stringify({ action: "start" }));
-};
-
-document.getElementById("reset").onclick = () => {
-  ws.send(JSON.stringify({ action: "reset" }));
-};
+document.getElementById("startBtn").onclick = () => ws.send("start");
+document.getElementById("resetBtn").onclick = () => ws.send("reset");
 </script>
-
 </body>
 </html>
