@@ -9,11 +9,15 @@ button { padding: 20px 50px; font-size: 20px; margin: 10px; border: none; border
 #startBtn { background: linear-gradient(to right, #4caf50, #81c784); color: white; }
 #resetBtn { background: linear-gradient(to right, #f44336, #e57373); color: white; }
 #status { font-size: 24px; margin-bottom: 20px; }
+#timer { font-size: 48px; margin: 20px; }
+#msg { font-size: 24px; color: red; }
 </style>
 </head>
 <body>
 <h1>Admin Panel</h1>
 <p id="status">connecting...</p>
+<p id="timer">-- s</p>
+<p id="msg"></p>
 <button id="startBtn">START</button>
 <button id="resetBtn">RESET</button>
 
@@ -26,10 +30,24 @@ ws.onopen = () => {
 };
 
 ws.onmessage = (event) => {
-  if(event.data === "start_sound") new Audio("/static/start.mp3").play();
-  else if(event.data === "warning") new Audio("/static/warning.mp3").play();
-  else if(event.data === "time_up") alert("TIME UP!");
-  else if(event.data === "reset") alert("Game Reset!");
+  const data = event.data;
+  if(data === "start_sound") new Audio("/static/start.mp3").play();
+  else if(data === "warning") new Audio("/static/warning.mp3").play();
+  else if(data === "time_up") document.getElementById("msg").innerText = "TIME UP!";
+  else if(data === "reset") {
+      document.getElementById("msg").innerText = "";
+      document.getElementById("timer").innerText = "-- s";
+  }
+  else if(data.startsWith("countdown:")) {
+      document.getElementById("timer").innerText = data.split(":")[1] + " s";
+  }
+  else if(data.startsWith("buzz_time:")) {
+      const parts = data.split(":");
+      document.getElementById("msg").innerText = `${parts[1]} basdı: ${parts[2]} ms`;
+  }
+  else if(data === "faul") {
+      document.getElementById("msg").innerText = "FAUL! Tez basıldı!";
+  }
 };
 
 document.getElementById("startBtn").onclick = () => ws.send("start");
