@@ -2,15 +2,22 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Player</title>
+<title>Player 1</title>
+<style>
+body { font-family: Arial; text-align: center; padding: 50px; background: #e0f7fa; }
+button { padding: 20px 50px; font-size: 22px; margin: 10px; border: none; border-radius: 12px; cursor: pointer; 
+         background: linear-gradient(to right, #2196f3, #64b5f6); color: white; transition: transform 0.1s; }
+button:active { transform: scale(0.95); }
+#status { font-size: 24px; margin-bottom: 20px; }
+</style>
 </head>
 <body>
-<h2>Player</h2>
+<h1>Player 1</h1>
 <p id="status">connecting...</p>
 <button id="buzzBtn">BUZZ</button>
 
 <script>
-const role = "player2"; // player1 və ya player2 faylda dəyişəcək
+const role = "player2"; // player2.html-də "player2" et
 const ws = new WebSocket("wss://br-buzz-bahruz.up.railway.app/ws");
 
 ws.onopen = () => {
@@ -20,14 +27,15 @@ ws.onopen = () => {
 
 ws.onmessage = (event) => {
   if(event.data === "won") alert("YOU WON!");
-  if(event.data === "lost") alert("YOU LOST!");
-  if(event.data === "warning") new Audio("/static/warning.mp3").play();
-  if(event.data === "start_sound") new Audio("/static/start.mp3").play();
-  if(event.data === "reset") alert("Game Reset!");
+  else if(event.data === "lost") alert("YOU LOST!");
+  else if(event.data === "warning") new Audio("/static/warning.mp3").play();
+  else if(event.data === "start_sound") new Audio("/static/start.mp3").play();
+  else if(event.data === "reset") alert("Game Reset!");
 };
 
 document.getElementById("buzzBtn").onclick = () => {
   ws.send("buzz:" + role);
+  new Audio("/static/buzz.mp3").play(); // BUZZ səsi
 };
 </script>
 </body>
