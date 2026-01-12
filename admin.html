@@ -1,92 +1,75 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
 <title>Admin Panel</title>
 <style>
 body {
-    font-family: Arial, sans-serif;
-    background: #1e1e1e;
-    color: #fff;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    min-height: 100vh;
-    padding-top: 50px;
+  font-family: system-ui;
+  background: #0f172a;
+  color: white;
+  text-align: center;
 }
-h1 { margin-bottom: 30px; }
 button {
-    font-size: 1.2em;
-    padding: 15px 30px;
-    margin: 10px;
-    border: none;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: 0.2s;
+  font-size: 22px;
+  padding: 14px 28px;
+  margin: 10px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
 }
-#startBtn { background: #4caf50; color: #fff; }
-#startBtn:hover { background: #45a049; }
-#resetBtn { background: #f44336; color: #fff; }
-#resetBtn:hover { background: #e53935; }
-#timer {
-    font-size: 3em;
-    margin-top: 40px;
-}
-.warning {
-    color: #ffeb3b;
-    animation: blink 1s infinite;
-}
-@keyframes blink {
-    0%,50%,100% { opacity: 1; }
-    25%,75% { opacity: 0.2; }
-}
+#start { background: #22c55e; }
+#reset { background: #ef4444; }
+#log { margin-top: 20px; font-size: 20px; }
 </style>
 </head>
 <body>
-<h1>Admin Panel</h1>
-<h2>Created by Bahruz</h2>
-<button id="startBtn">START</button>
-<button id="resetBtn">RESET</button>
-<p id="timer">Time: 0</p>
 
-<audio id="startSound" src="start.mp3"></audio>
-<audio id="warningSound" src="warning.mp3"></audio>
+<h1>ADMIN</h1>
+
+<button id="start">START</button>
+<button id="reset">RESET</button>
+
+<div id="log">Disconnected</div>
 
 <script>
-const ws = new WebSocket("ws://172.16.109.84:8765"); // SERVER_IP = Termux IP
-const startBtn = document.getElementById("startBtn");
-const resetBtn = document.getElementById("resetBtn");
-const timerP = document.getElementById("timer");
-const startSound = document.getElementById("startSound");
-const warningSound = document.getElementById("warningSound");
+const ws = new WebSocket("wss://SENIN-RAILWAY-URL/ws");
 
-ws.onopen = () => console.log("ADMIN WS CONNECTED");
+const log = document.getElementById("log");
 
-ws.onmessage = e => {
-    const data = JSON.parse(e.data);
+ws.onopen = () => {
+  ws.send(JSON.stringify({ role: "admin" }));
+  log.innerText = "Connected";
+};
 
-    if(data.type === "time") {
-        timerP.innerText = "Time: "+data.value;
-        timerP.classList.remove("warning");
-    }
-    else if(data.type === "warning") {
-        timerP.innerText = "Time: "+data.time;
-        timerP.classList.add("warning");
-        warningSound.play();
-    }
-    else if(data.type === "start") startSound.play();
-    else if(data.type === "reset") {
-        timerP.innerText = "Time: 0";
-        timerP.classList.remove("warning");
-    }
-    else if(data.type === "won") alert(data.player + " CAVAB HAQQI SIZDEDIR - gecikmeniz " + data.time + "ms");
-    else if(data.type === "faul") alert("FALLSTART!");
-    else if(data.type === "timeout") alert("VAXT CHIXDI");
-}
+ws.onmessage = (e) => {
+  const data = JSON.parse(e.data);
 
-startBtn.onclick = () => ws.send(JSON.stringify({type:"start"}));
-resetBtn.onclick = () => ws.send(JSON.stringify({type:"reset"}));
+  if (data.type === "countdown") {
+    log.innerText = "Time: " + data.value;
+  }
+
+  if (data.type === "won") {
+    log.innerText = `${data.player} WON (${data.reaction} ms)`;
+  }
+
+  if (data.type === "time_up") {
+    log.innerText = "TIME UP";
+  }
+
+  if (data.type === "reset") {
+    log.innerText = "RESET";
+  }
+};
+
+document.getElementById("start").onclick = () => {
+  ws.send(JSON.stringify({ action: "start" }));
+};
+
+document.getElementById("reset").onclick = () => {
+  ws.send(JSON.stringify({ action: "reset" }));
+};
 </script>
+
 </body>
 </html>
