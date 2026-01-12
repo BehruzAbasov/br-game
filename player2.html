@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Player</title>
+<style>
+body {
+  font-family: system-ui;
+  background: #020617;
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+button {
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  font-size: 28px;
+  border: none;
+  background: #3b82f6;
+  color: white;
+}
+#status {
+  position: absolute;
+  bottom: 40px;
+  font-size: 22px;
+}
+</style>
+</head>
+<body>
+
+<button id="buzz">BUZZ</button>
+<div id="status">Disconnected</div>
+
+<script>
+const PLAYER_ID = "player2"; // player2 üçün dəyiş
+
+const ws = new WebSocket("wss://SENIN-RAILWAY-URL/ws");
+const status = document.getElementById("status");
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({ role: PLAYER_ID }));
+  status.innerText = "Connected";
+};
+
+ws.onmessage = (e) => {
+  const data = JSON.parse(e.data);
+
+  if (data.type === "false_start") {
+    status.innerText = "FALSE START";
+  }
+
+  if (data.type === "won") {
+    status.innerText =
+      data.player === PLAYER_ID
+      ? `YOU WON (${data.reaction} ms)`
+      : `${data.player} WON`;
+  }
+
+  if (data.type === "reset") {
+    status.innerText = "READY";
+  }
+};
+
+document.getElementById("buzz").onclick = () => {
+  ws.send(JSON.stringify({ action: "buzz" }));
+};
+</script>
+
+</body>
+</html>
