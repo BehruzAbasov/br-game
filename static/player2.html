@@ -3,71 +3,32 @@
 <head>
 <meta charset="UTF-8">
 <title>Player</title>
-<style>
-body {
-  font-family: system-ui;
-  background: #020617;
-  color: white;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-}
-button {
-  width: 240px;
-  height: 240px;
-  border-radius: 50%;
-  font-size: 28px;
-  border: none;
-  background: #3b82f6;
-  color: white;
-}
-#status {
-  position: absolute;
-  bottom: 40px;
-  font-size: 22px;
-}
-</style>
 </head>
 <body>
-
-<button id="buzz">BUZZ</button>
-<div id="status">Disconnected</div>
+<h2>Player</h2>
+<p id="status">connecting...</p>
+<button id="buzzBtn">BUZZ</button>
 
 <script>
-const PLAYER_ID = "player2"; // player2 üçün dəyiş
-
-const ws = new WebSocket("wss://br-buzz-bahruz.up.railway.app/ws");
-const status = document.getElementById("status");
+const role = "player2"; // player1 və ya player2 faylda dəyişəcək
+const ws = new WebSocket("wss://YOUR_DOMAIN_HERE/ws");
 
 ws.onopen = () => {
-  ws.send(JSON.stringify({ role: PLAYER_ID }));
-  status.innerText = "Connected";
+  document.getElementById("status").innerText = "connected ✅";
+  ws.send(role);
 };
 
-ws.onmessage = (e) => {
-  const data = JSON.parse(e.data);
-
-  if (data.type === "false_start") {
-    status.innerText = "FALSE START";
-  }
-
-  if (data.type === "won") {
-    status.innerText =
-      data.player === PLAYER_ID
-      ? `YOU WON (${data.reaction} ms)`
-      : `${data.player} WON`;
-  }
-
-  if (data.type === "reset") {
-    status.innerText = "READY";
-  }
+ws.onmessage = (event) => {
+  if(event.data === "won") alert("YOU WON!");
+  if(event.data === "lost") alert("YOU LOST!");
+  if(event.data === "warning") new Audio("/static/warning.mp3").play();
+  if(event.data === "start_sound") new Audio("/static/start.mp3").play();
+  if(event.data === "reset") alert("Game Reset!");
 };
 
-document.getElementById("buzz").onclick = () => {
-  ws.send(JSON.stringify({ action: "buzz" }));
+document.getElementById("buzzBtn").onclick = () => {
+  ws.send("buzz:" + role);
 };
 </script>
-
 </body>
 </html>
