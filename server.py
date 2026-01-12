@@ -1,124 +1,75 @@
-import os
-import time
-import asyncio
-import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import asyncio
 
 app = FastAPI()
 
-# Railway PORT
-PORT = int(os.environ.get("PORT", 8080))
+# Static faylları /static altında serve edirik
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Static files (html + mp3)
-app.mount("/", StaticFiles(directory=".", html=True), name="static")
-
-# Game state
+# GAME STATE
 players = {}
-admin_ws = None
-
-game_active = False
-start_time = None
 countdown_task = None
-winner_declared = False
-
-COUNTDOWN_SECONDS = 20
-
-
-async def broadcast(message: dict):
-    for ws in players.values():
-        await ws.send_json(message)
-    if admin_ws:
-        await admin_ws.send_json(message)
+COUNTDOWN_TIME = 20  # saniyə
 
 
 async def countdown():
-    global game_active
-    for remaining in range(COUNTDOWN_SECONDS, 0, -1):
-        if not game_active:
-            return
-        await broadcast({"type": "countdown", "value": remaining})
+    global countdown_task
+    time_left = COUNTDOWN_TIME
+    while time_left > 0:
         await asyncio.sleep(1)
-
-    game_active = False
-    await broadcast({"type": "time_up"})
+        time_left -= 1
+        # Son 3 saniyə xəbərdarlıq
+        if time_left <= 3:
+            for ws in players.values():
+                await ws.send_text("warning")
+    countdown_task = None
+    for ws in players.values():
+        await ws.send_text("time_up")
 
 
 @app.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket):
-    global admin_ws, game_active, start_time, countdown_task, winner_declared
-
-    await ws.accept()
-
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
     try:
-        data = await ws.receive_json()
-        role = data.get("role")
+        # İlk mesajda rol (player1, player2, admin) göndərilir
+        role = await websocket.receive_text()
+        players[role] = websocket
+        await websocket.send_text("connected")
 
-        # ADMIN
-        if role == "admin":
-            admin_ws = ws
-            await ws.send_json({"type": "status", "message": "admin connected"})
-
-            while True:
-                msg = await ws.receive_json()
-
-                if msg["action"] == "start":
-                    if countdown_task:
-                        countdown_task.cancel()
-
-                    game_active = True
-                    winner_declared = False
-                    start_time = time.time()
-
-                    await broadcast({"type": "start"})
+        global countdown_task
+        while True:
+            msg = await websocket.receive_text()
+            
+            if msg == "start" and role == "admin":
+                if countdown_task is None:
                     countdown_task = asyncio.create_task(countdown())
+                    for ws in players.values():
+                        await ws.send_text("start_sound")
+            elif msg.startswith("buzz"):
+                if countdown_task:
+                    # İlk basan qalib
+                    player_name = msg.split(":")[1]
+                    for r, ws in players.items():
+                        if r == player_name:
+                            await ws.send_text("won")
+                        elif r != "admin":
+                            await ws.send_text("lost")
+                    # Stop countdown
+                    countdown_task.cancel()
+                    countdown_task = None
+            elif msg == "reset" and role == "admin":
+                if countdown_task:
+                    countdown_task.cancel()
+                    countdown_task = None
+                for ws in players.values():
+                    await ws.send_text("reset")
 
-                elif msg["action"] == "reset":
-                    if countdown_task:
-                        countdown_task.cancel()
-
-                    game_active = False
-                    winner_declared = False
-                    await broadcast({"type": "reset"})
-
-        # PLAYER
-        else:
-            player_id = role
-            players[player_id] = ws
-            await ws.send_json({"type": "status", "message": f"{player_id} connected"})
-
-            while True:
-                msg = await ws.receive_json()
-
-                if msg["action"] == "buzz":
-                    now = time.time()
-
-                    if not game_active:
-                        await ws.send_json({"type": "false_start"})
-                        continue
-
-                    if winner_declared:
-                        continue
-
-                    winner_declared = True
-                    game_active = False
-
-                    if countdown_task:
-                        countdown_task.cancel()
-
-                    reaction_ms = int((now - start_time) * 1000)
-
-                    await broadcast({
-                        "type": "won",
-                        "player": player_id,
-                        "reaction": reaction_ms
-                    })
-
-    except WebSocketDisconnect:
-        if ws == admin_ws:
-            admin_ws = None
-        else:
-            for k, v in list(players.items()):
-                if v == ws:
-                    del players[k]
+    except:
+        pass
+    finally:
+        # Disconnect zamanı players-dən sil
+        for k, v in list(players.items()):
+            if v == websocket:
+                del players[k]
