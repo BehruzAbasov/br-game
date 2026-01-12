@@ -1,6 +1,7 @@
 import os
 import time
 import asyncio
+import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
