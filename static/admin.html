@@ -2,10 +2,17 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Admin</title>
+<title>Admin Panel</title>
+<style>
+body { font-family: Arial; text-align: center; padding: 50px; background: #f0f0f0; }
+button { padding: 20px 50px; font-size: 20px; margin: 10px; border: none; border-radius: 12px; cursor: pointer; }
+#startBtn { background: linear-gradient(to right, #4caf50, #81c784); color: white; }
+#resetBtn { background: linear-gradient(to right, #f44336, #e57373); color: white; }
+#status { font-size: 24px; margin-bottom: 20px; }
+</style>
 </head>
 <body>
-<h2>Admin Panel</h2>
+<h1>Admin Panel</h1>
 <p id="status">connecting...</p>
 <button id="startBtn">START</button>
 <button id="resetBtn">RESET</button>
@@ -19,15 +26,10 @@ ws.onopen = () => {
 };
 
 ws.onmessage = (event) => {
-  if(event.data === "start_sound") {
-    new Audio("/static/start.mp3").play();
-  } else if(event.data === "warning") {
-    new Audio("/static/warning.mp3").play();
-  } else if(event.data === "time_up") {
-    alert("TIME UP!");
-  } else if(event.data === "reset") {
-    alert("Game Reset!");
-  }
+  if(event.data === "start_sound") new Audio("/static/start.mp3").play();
+  else if(event.data === "warning") new Audio("/static/warning.mp3").play();
+  else if(event.data === "time_up") alert("TIME UP!");
+  else if(event.data === "reset") alert("Game Reset!");
 };
 
 document.getElementById("startBtn").onclick = () => ws.send("start");
