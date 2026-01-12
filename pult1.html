@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PULT 1</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #222;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+h1 { margin-bottom: 20px; }
+button {
+    font-size: 2em;
+    padding: 20px 50px;
+    border: none;
+    border-radius: 15px;
+    background: #2196f3;
+    color: #fff;
+    cursor: pointer;
+    transition: 0.2s;
+}
+button:hover { background: #1976d2; }
+#status {
+    margin-top: 30px;
+    font-size: 2em;
+}
+.warning {
+    color: #ffeb3b;
+    animation: blink 1s infinite;
+}
+@keyframes blink {
+    0%,50%,100% { opacity: 1; }
+    25%,75% { opacity: 0.2; }
+}
+</style>
+</head>
+<body>
+<h1>PULT 1</h1>
+<h2>Created by BAHRUZ</h2>
+<button id="buzzBtn">BUZZ</button>
+<p id="status">Waiting...</p>
+<audio id="buzzSound" src="buzz.mp3"></audio>
+
+<script>
+const ws = new WebSocket("ws://172.16.109.84:8765"); // SERVER_IP = Termux IP
+const buzzBtn = document.getElementById("buzzBtn");
+const statusP = document.getElementById("status");
+const buzzSound = document.getElementById("buzzSound");
+
+ws.onopen = () => console.log("PLAYER1 WS CONNECTED");
+
+ws.onmessage = e => {
+    const data = JSON.parse(e.data);
+
+    if(data.type==="won" && data.player==="player1") statusP.innerText = "CAVAB HAQQI SIZDEDIR - gecikmeniz "+data.time+"ms";
+    else if(data.type==="faul") statusP.innerText = "FALLSTART";
+    else if(data.type==="warning") {
+        statusP.innerText = "Warning: "+data.time;
+        statusP.classList.add("warning");
+    }
+    else if(data.type==="time") {
+        statusP.innerText = "Time: "+data.value;
+        statusP.classList.remove("warning");
+    }
+    else if(data.type==="timeout") statusP.innerText = "VAXT CHIXDI";
+};
+
+buzzBtn.onclick = () => {
+    ws.send(JSON.stringify({type:"player1"}));
+    buzzSound.play();
+};
+</script>
+</body>
+</html>
