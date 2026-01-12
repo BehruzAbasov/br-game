@@ -24,15 +24,22 @@ button { padding: 20px 50px; font-size: 20px; margin: 10px; border: none; border
 <script>
 const ws = new WebSocket("wss://br-buzz-bahruz.up.railway.app/ws");
 
+// Audio preloads
+const startSound = new Audio("/static/start.mp3");
+startSound.preload = "auto";
+const warningSound = new Audio("/static/warning.mp3");
+warningSound.preload = "auto";
+
+// WS açıldı
 ws.onopen = () => {
   document.getElementById("status").innerText = "connected ✅";
   ws.send("admin");
 };
 
+// WS mesajları
 ws.onmessage = (event) => {
   const data = event.data;
-  if(data === "start_sound") new Audio("/static/start.mp3").play();
-  else if(data === "warning") new Audio("/static/warning.mp3").play();
+  if(data === "warning") warningSound.play();
   else if(data === "time_up") document.getElementById("msg").innerText = "TIME UP!";
   else if(data === "reset") {
       document.getElementById("msg").innerText = "";
@@ -50,8 +57,20 @@ ws.onmessage = (event) => {
   }
 };
 
-document.getElementById("startBtn").onclick = () => ws.send("start");
-document.getElementById("resetBtn").onclick = () => ws.send("reset");
+// START düyməsi
+document.getElementById("startBtn").onclick = () => {
+    // 1️⃣ dərhal səsi çal
+    startSound.currentTime = 0;
+    startSound.play();
+
+    // 2️⃣ serverə mesaj göndər
+    ws.send("start");
+};
+
+// RESET düyməsi
+document.getElementById("resetBtn").onclick = () => {
+    ws.send("reset");
+};
 </script>
 </body>
 </html>
