@@ -1,44 +1,46 @@
 from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 import asyncio
+from time import time
 
 app = FastAPI()
-
-# Static faylları /static altında serve edirik
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# GAME STATE
 players = {}
 countdown_task = None
 COUNTDOWN_TIME = 20  # saniyə
-
+game_active = False
+start_time = None
 
 async def countdown():
-    global countdown_task
+    global countdown_task, game_active, start_time
+    game_active = True
+    start_time = time()
     time_left = COUNTDOWN_TIME
-    while time_left > 0:
-        await asyncio.sleep(1)
-        time_left -= 1
-        # Son 3 saniyə xəbərdarlıq
-        if time_left <= 3:
+    try:
+        while time_left > 0:
+            await asyncio.sleep(0.1)
+            time_left = COUNTDOWN_TIME - int(time() - start_time)
+            if time_left <= 3:
+                for ws in players.values():
+                    await ws.send_text("warning")
             for ws in players.values():
-                await ws.send_text("warning")
-    countdown_task = None
-    for ws in players.values():
-        await ws.send_text("time_up")
-
+                await ws.send_text(f"countdown:{time_left}")
+        for ws in players.values():
+            await ws.send_text("time_up")
+    finally:
+        countdown_task = None
+        game_active = False
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    global countdown_task, game_active, start_time
     try:
-        # İlk mesajda rol (player1, player2, admin) göndərilir
         role = await websocket.receive_text()
         players[role] = websocket
         await websocket.send_text("connected")
 
-        global countdown_task
         while True:
             msg = await websocket.receive_text()
             
@@ -47,29 +49,46 @@ async def websocket_endpoint(websocket: WebSocket):
                     countdown_task = asyncio.create_task(countdown())
                     for ws in players.values():
                         await ws.send_text("start_sound")
-            elif msg.startswith("buzz"):
-                if countdown_task:
-                    # İlk basan qalib
-                    player_name = msg.split(":")[1]
+
+            elif msg.startswith("buzz:"):
+                player_name = msg.split(":")[1]
+                if not game_active:
+                    await websocket.send_text("faul")
+                else:
+                    ms_time = int((time() - start_time) * 1000)
                     for r, ws in players.items():
                         if r == player_name:
                             await ws.send_text("won")
                         elif r != "admin":
                             await ws.send_text("lost")
-                    # Stop countdown
-                    countdown_task.cancel()
-                    countdown_task = None
+                        # show buzz time for admin
+                        if r == "admin":
+                            await ws.send_text(f"buzz_time:{player_name}:{ms_time}")
+                    # stop countdown
+                    if countdown_task:
+                        countdown_task.cancel()
+                        countdown_task = None
+                        game_active = False
+
             elif msg == "reset" and role == "admin":
                 if countdown_task:
                     countdown_task.cancel()
                     countdown_task = None
+                game_active = False
+                start_time = None
                 for ws in players.values():
                     await ws.send_text("reset")
 
     except:
         pass
     finally:
-        # Disconnect zamanı players-dən sil
+        # disconnect zamanı sil
         for k, v in list(players.items()):
             if v == websocket:
                 del players[k]
+
+
+if __name__ == "__main__":
+    import os, uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("server:app", host="0.0.0.0", port=port)
