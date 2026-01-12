@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Player</title>
+<title>Player 1</title>
 <style>
 body { font-family: Arial; text-align: center; padding: 50px; background: #e0f7fa; }
 button { padding: 20px 50px; font-size: 22px; margin: 10px; border: none; border-radius: 12px; cursor: pointer;
@@ -12,32 +12,47 @@ button:active { transform: scale(0.95); }
 </style>
 </head>
 <body>
-<h1>Player</h1>
+<h1>Player 1</h1>
 <p id="status">connecting...</p>
 <button id="buzzBtn">BUZZ</button>
 
 <script>
+// Player rolu
 const role = "player2"; // player2.html-də "player2" et
+
+// WebSocket
 const ws = new WebSocket("wss://br-buzz-bahruz.up.railway.app/ws");
 
+// Dərhal səslər üçün preload
+const buzzSound = new Audio("/static/buzz.mp3");
+buzzSound.preload = "auto";
+const startSound = new Audio("/static/start.mp3");
+startSound.preload = "auto";
+const warningSound = new Audio("/static/warning.mp3");
+warningSound.preload = "auto";
+
+// WS açıldı
 ws.onopen = () => {
   document.getElementById("status").innerText = "connected ✅";
   ws.send(role);
 };
 
+// WS mesajları
 ws.onmessage = (event) => {
     const data = event.data;
     if(data === "won") alert("YOU WON!");
     else if(data === "lost") alert("YOU LOST!");
-    else if(data === "warning") new Audio("/static/warning.mp3").play();
-    else if(data === "start_sound") new Audio("/static/start.mp3").play();
+    else if(data === "warning") warningSound.play();
+    else if(data === "start_sound") startSound.play();
     else if(data === "reset") alert("Game Reset!");
     else if(data === "faul") alert("FAUL! Tez basıldı!");
 };
 
+// BUZZ düyməsi
 document.getElementById("buzzBtn").onclick = () => {
-    ws.send("buzz:" + role);
-    new Audio("/static/buzz.mp3").play();
+    buzzSound.currentTime = 0; // hər dəfə sıfırdan çal
+    buzzSound.play();           // dərhal səslə
+    ws.send("buzz:" + role);    // sonra serverə mesaj
 };
 </script>
 </body>
